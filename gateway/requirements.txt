@@ -1,0 +1,5 @@
+fastapi[all]==0.68.0
+nameko==2.13.0
+fastapi-jwt-auth==0.5.0
+python-dotenv==0.15.0
+passlib[bcrypt]==1.7.4
