@@ -1,11 +1,8 @@
-import logging
 from datetime import datetime
-
 import backoff
 import feedparser
 import requests
-from sqlalchemy import or_
-
+from sqlalchemy import and_
 from constants import RPCMicroServices
 from nameko.rpc import rpc
 from nameko_sqlalchemy import DatabaseSession
@@ -58,30 +55,40 @@ class FeedService:
     @rpc
     def create_user_feed(self, feed_dto, username):
         feed = FeedDTO(**feed_dto)
-        feed_obj = Feed(
-            title=feed.title,
-            link=feed.link,
-            rss_link=feed.rss_link,
-        )
-        self.db.add(feed_obj)
-        self.db.commit()
+        feed_exist = self.db.query(Feed).filter(Feed.rss_link == feed.rss_link).first()
+        if not feed_exist:
+            feed_obj = Feed(
+                title=feed.title,
+                link=feed.link,
+                rss_link=feed.rss_link,
+            )
+            self.db.add(feed_obj)
+            self.db.commit()
 
-        self.db.add(UserFeed(
-            username=username,
-            feed_id=feed_obj.id
-        ))
-        self.db.commit()
+            self.db.add(UserFeed(
+                username=username,
+                feed_id=feed_obj.id
+            ))
+            self.db.commit()
+            return True
+        else:
+            return False
 
     @rpc
     def create_feed(self, feed_dto):
         feed = FeedDTO(**feed_dto)
-        feed_obj = Feed(
-            title=feed.title,
-            link=feed.link,
-            rss_link=feed.rss_link,
-        )
-        self.db.add(feed_obj)
-        self.db.commit()
+        feed_exist = self.db.query(Feed).filter(Feed.rss_link == feed.rss_link).first()
+        if not feed_exist:
+            feed_obj = Feed(
+                title=feed.title,
+                link=feed.link,
+                rss_link=feed.rss_link,
+            )
+            self.db.add(feed_obj)
+            self.db.commit()
+            return True
+        else:
+            return False
 
     @rpc
     def read_user_feeds(self, username):
@@ -141,15 +148,63 @@ class FeedService:
     def read_user_feed_items(self, feed_id, username):
         user_feed = self.db.query(UserFeed).filter(UserFeed.username == username, UserFeed.feed_id == feed_id).first()
         if user_feed:
-            feed_items = self.db.query(FeedItem).outerjoin(UserFeedItem).filter(
-                or_(FeedItem.feed_id == feed_id, UserFeedItem.username == username)).all()
+            feed_items = self.db.query(FeedItem, UserFeedItem).outerjoin(UserFeedItem, and_(
+                UserFeedItem.feed_item_id == FeedItem.id,
+                UserFeedItem.username == username)).filter(
+                FeedItem.feed_id == feed_id).all()
+
             list_of_feed_items = []
             if feed_items:
                 for item in feed_items:
-                    list_of_feed_items.append(FeedItemDTO(**item.__dict__).dict())
+                    if item[1]:
+                        del item[1].__dict__['id']
+                        item[0].__dict__.update(item[1].__dict__)
+                    list_of_feed_items.append(FeedItemDTO(**item[0].__dict__).dict())
                 return {"data": list_of_feed_items}
             else:
                 return False
         else:
             return False
 
+    @rpc
+    def read_user_feed_one_item(self, feed_id, item_id, username):
+        user_feed = self.db.query(UserFeed).filter(UserFeed.username == username, UserFeed.feed_id == feed_id).first()
+        if user_feed:
+            feed_item = self.db.query(FeedItem, UserFeedItem).outerjoin(UserFeedItem, and_(
+                UserFeedItem.feed_item_id == FeedItem.id,
+                UserFeedItem.username == username)).filter(
+                FeedItem.feed_id == feed_id, FeedItem.id == item_id).first()
+
+            if feed_item:
+                if feed_item[1]:
+                    del feed_item[1].__dict__['id']
+                    feed_item[0].__dict__.update(feed_item[1].__dict__)
+
+                return FeedItemDTO(**feed_item[0].__dict__).dict()
+
+            else:
+                return False
+        else:
+            return False
+
+    @rpc
+    def item_action(self, feed_id, item_id, username, is_favorite=None, read_later=None, is_read=None):
+        user_feed = self.db.query(UserFeed).filter(UserFeed.username == username, UserFeed.feed_id == feed_id).first()
+        if user_feed:
+            user_feed_item = self.db.query(UserFeedItem).filter(UserFeedItem.feed_item_id == item_id,
+                                                                UserFeedItem.username == username).first()
+            if not user_feed_item:
+                self.db.add(
+                    UserFeedItem(feed_item_id=item_id, is_favorite=is_favorite, read_later=read_later, is_read=is_read,
+                                 username=username))
+                self.db.commit()
+                return True
+            elif any((is_favorite, read_later, is_read)):
+                actions_dict = {"is_favorite": is_favorite, "read_later": read_later, "is_read": is_read}
+                actions_dict = {k: v for k, v in actions_dict.items() if v is not None}
+                for key, value in actions_dict.items():
+                    setattr(user_feed_item, key, value)
+                self.db.commit()
+                return True
+
+        return False

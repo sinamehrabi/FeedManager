@@ -47,7 +47,7 @@ class FeedItem(DeclarativeBase):
     link = Column(String)
     updated_feed_item = Column(DateTime)
     summary = Column(String)
-    user_feed_items = relationship("UserFeedItem", back_populates="feed_item")
+    user_feed_items = relationship("UserFeedItem", lazy='joined', uselist=True, back_populates="feed_item")
 
 
 class UserFeed(DeclarativeBase):
@@ -68,5 +68,5 @@ class UserFeedItem(DeclarativeBase):
     is_read = Column(Boolean, default=False)
     is_favorite = Column(Boolean, default=False)
     read_later = Column(Boolean, default=False)
-    feed_item = relationship(FeedItem, back_populates="user_feed_items")
+    feed_item = relationship(FeedItem, lazy='joined', uselist=False, back_populates="user_feed_items")
 
