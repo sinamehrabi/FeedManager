@@ -37,7 +37,7 @@ def run_migrations_offline():
     script output.
 
     """
-    url = 'sqlite:///user_service.db'
+    url = 'sqlite:///user_database.db'
     context.configure(
         url=url,
         target_metadata=target_metadata,

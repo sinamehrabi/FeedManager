@@ -4,7 +4,7 @@ rpc_exchange: 'nameko-rpc'
 max_workers: 10
 parent_calls_tracked: 10
 DB_URIS:
-  'user_service:Base': 'sqlite:///user_service.db'
+  'user_service:Base': 'sqlite:///user_database.db'
 
 LOGGING:
   version: 1

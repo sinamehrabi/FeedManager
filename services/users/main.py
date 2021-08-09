@@ -50,9 +50,9 @@ class UserService:
     @rpc
     def login_user(self, email, password):
         user = self.db.query(User).filter(User.email == email).first()
-        hashed_password = verify_password(password, user.hashed_password)
-        if hashed_password:
-            if user:
+        if user:
+            hashed_password = verify_password(password, user.hashed_password)
+            if hashed_password:
                 data = UserDTO(username=user.username, email=user.email, is_active=user.is_active)
                 return data.dict()
             else:
