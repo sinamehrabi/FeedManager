@@ -5,10 +5,9 @@ from nameko.standalone.rpc import ServiceRpcProxy
 from fastapi.responses import JSONResponse
 from fastapi_jwt_auth import AuthJWT
 from fastapi_jwt_auth.exceptions import AuthJWTException
-from schema import Settings, UserDTO, AuthDTO
+from schema import Settings, UserDTO, AuthDTO, FeedDTO, ListFeedDTO, ListFeedItemDTO
 from dotenv import load_dotenv
 from constants import ConfigKeys, RPCMicroServices
-from passlib.context import CryptContext
 
 load_dotenv()
 
@@ -17,8 +16,6 @@ app = FastAPI(title="Api Gateway",
               version="0.0.1",
               docs_url=os.getenv(ConfigKeys.DocUrl),
               )
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def rpc_proxy(service):
@@ -76,3 +73,86 @@ def login_user(user: UserDTO, Authorize: AuthJWT = Depends()):
             return auth_resp.dict()
         else:
             raise HTTPException(status_code=400, detail="User not exist with these credentials!")
+
+
+@app.get("/feeds", response_model=ListFeedDTO)
+def read_feeds(Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+        feeds = rpc.read_feeds()
+        if feeds:
+            return feeds
+        else:
+            raise HTTPException(status_code=404, detail="There is no feed!")
+
+
+@app.get("/feeds/{feed_id}", response_model=FeedDTO)
+def read_one_feed(feed_id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+        feed = rpc.read_one_feed(feed_id)
+        if feed:
+            return feed
+        else:
+            raise HTTPException(status_code=404, detail=f"There is no feed with {feed_id} id!")
+
+
+@app.post("/feeds", status_code=201)
+def create_feed(feed: FeedDTO, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+        rpc.create_feed(feed.dict())
+
+
+@app.get("/users/me/feeds", response_model=ListFeedDTO)
+def read_user_feeds(Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    username = Authorize.get_jwt_subject()
+
+    with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+        feeds = rpc.read_user_feeds(username)
+        if feeds:
+            return feeds
+        else:
+            raise HTTPException(status_code=404, detail=f"There is no feed for you!")
+
+
+@app.post("/users/me/feeds/{feed_id}/select", status_code=204)
+def bookmark_feed(feed_id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    username = Authorize.get_jwt_subject()
+
+    with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+        result = rpc.select_feed(username, feed_id)
+        if result:
+            return
+        else:
+            raise HTTPException(status_code=400, detail=f"You selected this feed before!")
+
+
+@app.delete("/users/me/feeds/{feed_id}/select", status_code=204)
+def bookmark_feed(feed_id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    username = Authorize.get_jwt_subject()
+
+    with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+        result = rpc.deselect_feed(username, feed_id)
+        if result:
+            return
+        else:
+            raise HTTPException(status_code=400, detail=f"You didn't select this feed before!")
+
+
+@app.get("/users/me/feeds/{feed_id}/items", response_model=ListFeedItemDTO)
+def read_user_feeds(feed_id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    username = Authorize.get_jwt_subject()
+
+    with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+        feeds = rpc.read_user_feed_items(feed_id, username)
+        if feeds:
+            return feeds
+        else:
+            raise HTTPException(status_code=404, detail=f"There is no feed items for you!")
