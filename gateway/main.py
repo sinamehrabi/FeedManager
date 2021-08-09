@@ -1,14 +1,14 @@
 import os
-
+import datetime
+from typing import Optional
 from fastapi import FastAPI, Depends, Request, HTTPException
 from nameko.standalone.rpc import ServiceRpcProxy
 from fastapi.responses import JSONResponse
 from fastapi_jwt_auth import AuthJWT
 from fastapi_jwt_auth.exceptions import AuthJWTException
-from schema import Settings, UserDTO, AuthDTO, FeedDTO, ListFeedDTO, ListFeedItemDTO
+from schema import Settings, UserDTO, AuthDTO, FeedDTO, ListFeedDTO, ListFeedItemDTO, FeedItemDTO
 from dotenv import load_dotenv
 from constants import ConfigKeys, RPCMicroServices
-
 load_dotenv()
 
 app = FastAPI(title="Api Gateway",
@@ -41,8 +41,10 @@ def register(user: UserDTO, Authorize: AuthJWT = Depends()):
     with rpc_proxy(RPCMicroServices.UserService) as rpc:
         result = rpc.create_user(dto=user.dict())
         if result:
-            auth_resp = AuthDTO(access_token=Authorize.create_access_token(subject=result['username']),
-                                refresh_token=Authorize.create_refresh_token(subject=result['username']))
+            auth_resp = AuthDTO(access_token=Authorize.create_access_token(subject=result['username'],
+                                                                           expires_time=datetime.timedelta(days=1)),
+                                refresh_token=Authorize.create_refresh_token(subject=result['username'],
+                                                                             expires_time=datetime.timedelta(days=1)))
             return auth_resp.dict()
         else:
             raise HTTPException(status_code=400, detail="User exists!")
@@ -68,8 +70,10 @@ def login_user(user: UserDTO, Authorize: AuthJWT = Depends()):
         result = rpc.login_user(email=user.email, password=user.password)
 
         if result:
-            auth_resp = AuthDTO(access_token=Authorize.create_access_token(subject=result['username']),
-                                refresh_token=Authorize.create_refresh_token(subject=result['username']))
+            auth_resp = AuthDTO(access_token=Authorize.create_access_token(subject=result['username'],
+                                                                           expires_time=datetime.timedelta(days=1)),
+                                refresh_token=Authorize.create_refresh_token(subject=result['username'],
+                                                                             expires_time=datetime.timedelta(days=1)))
             return auth_resp.dict()
         else:
             raise HTTPException(status_code=400, detail="User not exist with these credentials!")
@@ -146,7 +150,7 @@ def bookmark_feed(feed_id: str, Authorize: AuthJWT = Depends()):
 
 
 @app.get("/users/me/feeds/{feed_id}/items", response_model=ListFeedItemDTO)
-def read_user_feeds(feed_id: str, Authorize: AuthJWT = Depends()):
+def read_user_feeds_items(feed_id: str, Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     username = Authorize.get_jwt_subject()
 
@@ -156,3 +160,34 @@ def read_user_feeds(feed_id: str, Authorize: AuthJWT = Depends()):
             return feeds
         else:
             raise HTTPException(status_code=404, detail=f"There is no feed items for you!")
+
+
+@app.patch("/users/me/feeds/{feed_id}/items/{item_id}/action", status_code=204)
+def user_feed_item_favorite(feed_id: str, item_id: str, is_favorite: Optional[bool] = None,
+                            read_later: Optional[bool] = None, is_read: Optional[bool] = None,
+                            Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    username = Authorize.get_jwt_subject()
+    if any((is_favorite, read_later, is_read)):
+        with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+            feeds = rpc.item_action(feed_id, item_id, username, is_favorite, read_later, is_read)
+            if feeds:
+                return
+            else:
+                raise HTTPException(status_code=400, detail=f"you did not bookmark this feed")
+    else:
+        raise HTTPException(status_code=400,
+                            detail=f"one of these actions should be set true: is_favorite, read_later, is_read")
+
+
+@app.get("/users/me/feeds/{feed_id}/items/{item_id}", response_model=FeedItemDTO)
+def read_user_feeds_items(feed_id: str, item_id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    username = Authorize.get_jwt_subject()
+
+    with rpc_proxy(RPCMicroServices.FeedService) as rpc:
+        feeds = rpc.read_user_feed_one_item(feed_id, item_id, username)
+        if feeds:
+            return feeds
+        else:
+            raise HTTPException(status_code=404, detail=f"There is no feed items for you or it's not selected feed!")
