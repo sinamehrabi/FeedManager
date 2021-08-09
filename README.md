@@ -1,6 +1,6 @@
 # Feed Manager
 This project is a RSS scraper and feed manager backend service with `python 3.9`. The service is for saving RSS feeds to a database and users can read and bookmark them.
-This is developed using FastAPI and Nameko for microservice design. I also use sqlite database for development and use pytest for nameko services.
+This is developed using FastAPI and Nameko for microservice design with isolated databases for each service. I also use sqlite database for development and use pytest for nameko services.
 The project services are:
 
 1. gateway service:
