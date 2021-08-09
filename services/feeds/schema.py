@@ -20,3 +20,8 @@ class FeedItemDTO(BaseModel):
     is_read: bool = False
     is_favorite: bool = False
     read_later: bool = False
+    comment: str = None
+
+
+class CommentDTO(BaseModel):
+    comment: str = None

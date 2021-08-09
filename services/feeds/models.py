@@ -68,5 +68,6 @@ class UserFeedItem(DeclarativeBase):
     is_read = Column(Boolean, default=False)
     is_favorite = Column(Boolean, default=False)
     read_later = Column(Boolean, default=False)
+    comment = Column(String, nullable=True, default='')
     feed_item = relationship(FeedItem, lazy='joined', uselist=False, back_populates="user_feed_items")
 

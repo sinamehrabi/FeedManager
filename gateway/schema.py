@@ -16,8 +16,8 @@ class Settings(BaseModel):
 
 
 class AuthDTO(BaseModel):
-    access_token: str
-    refresh_token: str
+    access_token: str = None
+    refresh_token: str = None
 
 
 class FeedDTO(BaseModel):
@@ -41,7 +41,12 @@ class FeedItemDTO(BaseModel):
     is_read: bool = False
     is_favorite: bool = False
     read_later: bool = False
+    comment: str = None
 
 
 class ListFeedItemDTO(BaseModel):
     data: List[FeedItemDTO]
+
+
+class CommentDTO(BaseModel):
+    comment: str = None

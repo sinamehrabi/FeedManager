@@ -7,7 +7,7 @@ from constants import RPCMicroServices
 from nameko.rpc import rpc
 from nameko_sqlalchemy import DatabaseSession
 from models import DeclarativeBase, Feed, FeedItem, UserFeed, UserFeedItem
-from schema import FeedDTO, FeedItemDTO
+from schema import FeedDTO, FeedItemDTO, CommentDTO
 
 
 class FeedService:
@@ -204,6 +204,29 @@ class FeedService:
                 actions_dict = {k: v for k, v in actions_dict.items() if v is not None}
                 for key, value in actions_dict.items():
                     setattr(user_feed_item, key, value)
+                self.db.commit()
+                return True
+
+        return False
+
+
+    @rpc
+    def item_comment(self, feed_id, item_id, username, comment):
+        comment_dto = CommentDTO(**comment)
+
+        user_feed = self.db.query(UserFeed).filter(UserFeed.username == username, UserFeed.feed_id == feed_id).first()
+        if user_feed:
+            user_feed_item = self.db.query(UserFeedItem).filter(UserFeedItem.feed_item_id == item_id,
+                                                                UserFeedItem.username == username).first()
+            if not user_feed_item:
+                self.db.add(
+                    UserFeedItem(feed_item_id=item_id, comment=comment_dto.comment,
+                                 username=username))
+                self.db.commit()
+                return True
+
+            else:
+                user_feed_item.comment = comment_dto.comment
                 self.db.commit()
                 return True
 
