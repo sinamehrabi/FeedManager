@@ -2,3 +2,7 @@ nameko==2.13.0
 nameko-sqlalchemy==1.5.0
 alembic==1.6.5
 pydantic==1.8.2
+celery==4.4.0
+backoff==1.11.1
+requests==2.26.0
+feedparser==6.0.8
