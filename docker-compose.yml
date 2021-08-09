@@ -39,6 +39,7 @@ services:
 
     networks:
       - app-network
+
   rabbit:
     container_name: nameko.rabbit
     image: rabbitmq:3-management
@@ -51,6 +52,18 @@ services:
       RABBITMQ_DEFAULT_VHOST: /
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    networks:
+      - app-network
+
+  celery:
+    container_name: nameko.celery
+    restart: always
+    build:
+      context: ./services/feeds
+      dockerfile: Dockerfile
+    command: celery -A celery_worker  worker -B
+    depends_on:
+      - rabbit
     networks:
       - app-network
 
