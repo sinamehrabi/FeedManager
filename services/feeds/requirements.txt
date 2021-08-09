@@ -6,3 +6,6 @@ celery==4.4.0
 backoff==1.11.1
 requests==2.26.0
 feedparser==6.0.8
+pytest==6.2.4
+python-dotenv==0.15.0
+
